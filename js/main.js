@@ -14,12 +14,16 @@ var lineMeshes = [];
 var linesHolder = null;
 var lineMaterial = null;
 
+var planeMesh = null;
+var spotLight = null;
+
 var controls = null;
 
 var config = {
-	maxLines: 50,
-	fftSize: 512,
-	peakXSpacing: 1
+	maxLines: 100,
+	fftSize: 256,
+	peakXSpacing: 1,
+	peakZSpacing: 2
 }
 
 var SoundControl = function(src){
@@ -79,32 +83,86 @@ $(function(){
 		analyser.fftSize = config.fftSize;
 		console.log('analyser: ', analyser);
 	} catch(e) {
+		console.log('e: ', e);
 		alert('Web Audio API is not supported in this browser');
 	}
 });
 
 var initScene = function(){
 	scene = new THREE.Scene();
-	scene.fog = new THREE.Fog( '#ECD078', 0, 500 );
+	//scene.fog = new THREE.Fog( '#ECD078', 0, 500 );
 	camera = new THREE.PerspectiveCamera( 75, $(document).width() / $(document).height(), 0.1, 1000 );
 
+	// Renderer
 	renderer = new THREE.WebGLRenderer();
 	renderer.setSize( window.innerWidth, window.innerHeight );
-	renderer.setClearColorHex( 0xECD078, 1 );
+	renderer.setClearColor( 0xECD078, 1 );
+	renderer.shadowMapEnabled = true;
 	document.body.appendChild( renderer.domElement );
 
+	// orbit control
 	controls = new THREE.OrbitControls( camera, renderer.domElement );
 
 	linesHolder = new THREE.Object3D();
 	linesHolder.position.x = -(config.peakXSpacing*analyser.frequencyBinCount)/2 + 20;
 	linesHolder.position.y = -30;
 
-	scene.add( linesHolder );
+	spotLight = new THREE.SpotLight( 0xD95B43 );
+	spotLight.castShadow = true;
+	//spotLight.shadowCameraVisible = true;
+	spotLight.position.set( -56, 250, -121 );
 
-	lineMaterial = new THREE.LineBasicMaterial({color:'#C02942'}); 
+	spotLight.shadowMapWidth = 1024;
+	spotLight.shadowMapHeight = 1024;
+
+	spotLight.shadowCameraNear = 500;
+	spotLight.shadowCameraFar = 4000;
+	spotLight.shadowCameraFov = 30;
+
+	scene.add( spotLight );
+	gui.add(spotLight.position, 'x', -500, 500);
+	gui.add(spotLight.position, 'y', -500, 500);
+	gui.add(spotLight.position, 'z', -500, 500);
+	//gui.add(spotLight, 'shadowMapWidth', 0, 1500);
+	//gui.add(spotLight, 'shadowMapHeight', 0, 1500);
+
+	// Create plane
+	//var basicMaterial = new THREE.MeshPhongMaterial( {color:'#D95B43', wireframe:false, shading:THREE.FlatShading} );
+	//var basicMaterial = new THREE.MeshLambertMaterial( {color:'#D95B43', wireframe:false, shading:THREE.FlatShading} );
+	var basicMaterial = new THREE.MeshPhongMaterial( {wireframe:false, shading:THREE.FlatShading} );
+	basicMaterial.vertexColors = true;
+	var planeGeometry = new THREE.Geometry();
+
+	var freqBinCount = analyser.frequencyBinCount;
+	for (var i = 0, len = config.maxLines; i < len; i += 1) {
+		// Generate vertices
+		for (var j = 0; j < freqBinCount; j += 1) {
+			planeGeometry.vertices.push( new THREE.Vector3( config.peakXSpacing*j, 0, -config.peakZSpacing*i ) );
+			planeGeometry.colors.push( 0xD95B43 );
+		}
+		// Generate faces
+		if (i > 0){
+			var curRowStartIndex = freqBinCount*i;
+			var prevRowStartIndex = freqBinCount*(i-1);
+			for (var k = 0; k < freqBinCount-1; k += 1) {
+				var a = prevRowStartIndex + k; 
+				var b = curRowStartIndex + k;
+				var c = curRowStartIndex + k+1;
+				var d = prevRowStartIndex + k+1;
+				planeGeometry.faces.push( new THREE.Face3( a, c, b, new THREE.Vector3( 0, 1, 0 ), '#fff', 0 ) );
+				planeGeometry.faces.push( new THREE.Face3( d, c, a, new THREE.Vector3( 0, 1, 0 ), '#fff', 0 ) );
+			}
+		}
+	}
+	planeMesh = new THREE.Mesh(planeGeometry, basicMaterial);
+	planeMesh.castShadow = false;
+	planeMesh.receiveShadow = false;
+	planeMesh.position.x = -(config.peakXSpacing*freqBinCount)/2;
+	planeMesh.position.y = -20;
+	planeMesh.position.z = 10;
+	scene.add( planeMesh );
 
 	camera.position.z = 100;
-	camera.position.y = 0;
 
 	render();
 }
@@ -114,8 +172,30 @@ function render() {
 
 	controls.update();
 
-	createLine();
+	raiseVertices();
+
 	renderer.render(scene, camera);
+}
+
+var raiseVertices = function(){
+	var freqBinCount = analyser.frequencyBinCount;
+	for (var i = config.maxLines-1; i > 0; i -= 1) {
+		// Generate vertices
+		var curRowStartIndex = freqBinCount*i;
+		var prevRowStartIndex = freqBinCount*(i-1);
+		for (var j = 0; j < freqBinCount; j += 1) {
+			planeMesh.geometry.vertices[curRowStartIndex+j].y = planeMesh.geometry.vertices[prevRowStartIndex+j].y + 1;
+		}
+	}
+	// Current row data
+	freqData = new Uint8Array(analyser.frequencyBinCount);
+  	analyser.getByteFrequencyData(freqData);
+  	for (var i = 0, len = freqData.length; i < len; i += 1) {
+  		//if (freqData[i]===0) break;
+  		var y = (freqData[i]/255)*50;
+  		planeMesh.geometry.vertices[i].y = y;
+  	}
+	planeMesh.geometry.verticesNeedUpdate = true;
 }
 
 var createLine = function(){
