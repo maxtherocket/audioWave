@@ -21,9 +21,9 @@ var controls = null;
 
 var config = {
 	maxLines: 100,
-	fftSize: 256,
-	peakXSpacing: 1,
-	peakZSpacing: 2
+	fftSize: 64,
+	peakXSpacing: 10,
+	peakZSpacing: 10
 }
 
 var SoundControl = function(src){
@@ -81,6 +81,7 @@ $(function(){
 		player.load(songLoaded);
 		analyser = context.createAnalyser();
 		analyser.fftSize = config.fftSize;
+		analyser.smoothingTimeConstant = 0.5;
 		console.log('analyser: ', analyser);
 	} catch(e) {
 		console.log('e: ', e);
@@ -105,7 +106,7 @@ var initScene = function(){
 
 	linesHolder = new THREE.Object3D();
 	linesHolder.position.x = -(config.peakXSpacing*analyser.frequencyBinCount)/2 + 20;
-	linesHolder.position.y = -30;
+	linesHolder.position.y = -50;
 
 	spotLight = new THREE.SpotLight( 0xD95B43 );
 	spotLight.castShadow = true;
@@ -129,8 +130,9 @@ var initScene = function(){
 	// Create plane
 	//var basicMaterial = new THREE.MeshPhongMaterial( {color:'#D95B43', wireframe:false, shading:THREE.FlatShading} );
 	//var basicMaterial = new THREE.MeshLambertMaterial( {color:'#D95B43', wireframe:false, shading:THREE.FlatShading} );
-	var basicMaterial = new THREE.MeshPhongMaterial( {wireframe:false, shading:THREE.FlatShading} );
-	basicMaterial.vertexColors = true;
+	var basicMaterial = new THREE.MeshLambertMaterial( {wireframe:false, shading: THREE.FlatShading } );
+	//var basicMaterial = new THREE.MeshNormalMaterial( {wireframe:false, shading: THREE.FlatShading } );
+	//basicMaterial.vertexColors = true;
 	var planeGeometry = new THREE.Geometry();
 
 	var freqBinCount = analyser.frequencyBinCount;
@@ -138,7 +140,7 @@ var initScene = function(){
 		// Generate vertices
 		for (var j = 0; j < freqBinCount; j += 1) {
 			planeGeometry.vertices.push( new THREE.Vector3( config.peakXSpacing*j, 0, -config.peakZSpacing*i ) );
-			planeGeometry.colors.push( 0xD95B43 );
+			//planeGeometry.colors.push( 0xD95B43 );
 		}
 		// Generate faces
 		if (i > 0){
@@ -149,14 +151,14 @@ var initScene = function(){
 				var b = curRowStartIndex + k;
 				var c = curRowStartIndex + k+1;
 				var d = prevRowStartIndex + k+1;
-				planeGeometry.faces.push( new THREE.Face3( a, c, b, new THREE.Vector3( 0, 1, 0 ), '#fff', 0 ) );
-				planeGeometry.faces.push( new THREE.Face3( d, c, a, new THREE.Vector3( 0, 1, 0 ), '#fff', 0 ) );
+				planeGeometry.faces.push( new THREE.Face3( a, c, b) );
+				planeGeometry.faces.push( new THREE.Face3( d, c, a) );
 			}
 		}
 	}
 	planeMesh = new THREE.Mesh(planeGeometry, basicMaterial);
-	planeMesh.castShadow = false;
-	planeMesh.receiveShadow = false;
+	planeMesh.castShadow = true;
+	planeMesh.receiveShadow = true;
 	planeMesh.position.x = -(config.peakXSpacing*freqBinCount)/2;
 	planeMesh.position.y = -20;
 	planeMesh.position.z = 10;
@@ -184,7 +186,7 @@ var raiseVertices = function(){
 		var curRowStartIndex = freqBinCount*i;
 		var prevRowStartIndex = freqBinCount*(i-1);
 		for (var j = 0; j < freqBinCount; j += 1) {
-			planeMesh.geometry.vertices[curRowStartIndex+j].y = planeMesh.geometry.vertices[prevRowStartIndex+j].y + 1;
+			planeMesh.geometry.vertices[curRowStartIndex+j].y = planeMesh.geometry.vertices[prevRowStartIndex+j].y;
 		}
 	}
 	// Current row data
@@ -192,10 +194,13 @@ var raiseVertices = function(){
   	analyser.getByteFrequencyData(freqData);
   	for (var i = 0, len = freqData.length; i < len; i += 1) {
   		//if (freqData[i]===0) break;
-  		var y = (freqData[i]/255)*50;
+  		var y = (freqData[i]/255)*90;
   		planeMesh.geometry.vertices[i].y = y;
   	}
+
+  	planeMesh.geometry.computeFaceNormals();
 	planeMesh.geometry.verticesNeedUpdate = true;
+	planeMesh.geometry.normalsNeedUpdate = true;
 }
 
 var createLine = function(){
