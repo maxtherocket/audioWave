@@ -57,7 +57,7 @@ var loadSong = function(url) {
 }
 
 var songLoaded = function(){
-	gui.add(player, 'play');
+	//gui.add(player, 'play');
   	gui.add(player, 'stop');
   	player.source.connect(analyser);
   	player.play();
@@ -96,7 +96,7 @@ var initScene = function(){
 
 	// Renderer
 	renderer = new THREE.WebGLRenderer();
-	renderer.setSize( window.innerWidth, window.innerHeight );
+	renderer.setSize( $(document).width(), $(document).height() );
 	renderer.setClearColor( 0xECD078, 1 );
 	renderer.shadowMapEnabled = true;
 	document.body.appendChild( renderer.domElement );
@@ -111,7 +111,7 @@ var initScene = function(){
 	spotLight = new THREE.SpotLight( 0xD95B43 );
 	spotLight.castShadow = true;
 	//spotLight.shadowCameraVisible = true;
-	spotLight.position.set( -56, 250, -121 );
+	spotLight.position.set( 1000, 1000, 344 );
 
 	spotLight.shadowMapWidth = 1024;
 	spotLight.shadowMapHeight = 1024;
@@ -121,9 +121,10 @@ var initScene = function(){
 	spotLight.shadowCameraFov = 30;
 
 	scene.add( spotLight );
-	gui.add(spotLight.position, 'x', -500, 500);
-	gui.add(spotLight.position, 'y', -500, 500);
-	gui.add(spotLight.position, 'z', -500, 500);
+	var lightControls = gui.addFolder('Light Position');
+	lightControls.add(spotLight.position, 'x', -500, 1000);
+	lightControls.add(spotLight.position, 'y', -500, 1000);
+	lightControls.add(spotLight.position, 'z', -500, 1000);
 	//gui.add(spotLight, 'shadowMapWidth', 0, 1500);
 	//gui.add(spotLight, 'shadowMapHeight', 0, 1500);
 
